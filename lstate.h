@@ -306,7 +306,7 @@ struct lua_State {
   lu_byte status;
   lu_byte allowhook;
   unsigned short nci;  /* number of items in 'ci' list */
-  StkId top;  /* first free slot in the stack */
+  StkId top;  /* first free slot in the stack */  // stack上第一个空闲的slot
   global_State *l_G;
   CallInfo *ci;  /* call info for current function */
   StkId stack_last;  /* end of stack (last element + 1) */
@@ -401,4 +401,3 @@ LUAI_FUNC int luaE_resetthread (lua_State *L, int status);
 
 
 #endif
-

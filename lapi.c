@@ -1094,6 +1094,7 @@ LUA_API int lua_load (lua_State *L, lua_Reader reader, void *data,
   lua_lock(L);
   if (!chunkname) chunkname = "?";
   luaZ_init(L, &z, reader, data);
+  // parse的lua字节码函数，放在stack的top-1位置
   status = luaD_protectedparser(L, &z, chunkname, mode);
   if (status == LUA_OK) {  /* no errors? */
     LClosure *f = clLvalue(s2v(L->top - 1));  /* get newly created function */
@@ -1462,5 +1463,3 @@ LUA_API void lua_upvaluejoin (lua_State *L, int fidx1, int n1,
   *up1 = *up2;
   luaC_objbarrier(L, f1, *up1);
 }
-
-

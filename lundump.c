@@ -253,6 +253,7 @@ static void loadDebug (LoadState *S, Proto *f) {
 }
 
 
+// 按照格式来load一个函数, refer to luaU_dump函数
 static void loadFunction (LoadState *S, Proto *f, TString *psource) {
   f->source = loadStringN(S, f);
   if (f->source == NULL)  /* no source in dump? */
@@ -330,4 +331,3 @@ LClosure *luaU_undump(lua_State *L, ZIO *Z, const char *name) {
   luai_verifycode(L, cl->p);
   return cl;
 }
-

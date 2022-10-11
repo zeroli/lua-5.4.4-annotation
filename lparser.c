@@ -1945,9 +1945,11 @@ LClosure *luaY_parser (lua_State *L, ZIO *z, Mbuffer *buff,
   LClosure *cl = luaF_newLclosure(L, 1);  /* create main closure */
   setclLvalue2s(L, L->top, cl);  /* anchor it (to avoid being collected) */
   luaD_inctop(L);
+
   lexstate.h = luaH_new(L);  /* create table for scanner */
   sethvalue2s(L, L->top, lexstate.h);  /* anchor it */
   luaD_inctop(L);
+
   funcstate.f = cl->p = luaF_newproto(L);
   luaC_objbarrier(L, cl, cl->p);
   funcstate.f->source = luaS_new(L, name);  /* create and anchor TString */
@@ -1963,4 +1965,3 @@ LClosure *luaY_parser (lua_State *L, ZIO *z, Mbuffer *buff,
   L->top--;  /* remove scanner's table */
   return cl;  /* closure is on the stack, too */
 }
-

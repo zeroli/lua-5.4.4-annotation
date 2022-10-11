@@ -24,13 +24,14 @@ int luaZ_fill (ZIO *z) {
   size_t size;
   lua_State *L = z->L;
   const char *buff;
-  lua_unlock(L);
+  lua_unlock(L);  // ****
   buff = z->reader(L, z->data, &size);
   lua_lock(L);
   if (buff == NULL || size == 0)
     return EOZ;
   z->n = size - 1;  /* discount char being returned */
   z->p = buff;
+  // 返回第一个字节，tricky
   return cast_uchar(*(z->p++));
 }
 
@@ -45,6 +46,8 @@ void luaZ_init (lua_State *L, ZIO *z, lua_Reader reader, void *data) {
 
 
 /* --------------------------------------------------------------- read --- */
+// 从Z中读取n字节，填充到b开始的buffer中
+// 返回还有多少字节未读
 size_t luaZ_read (ZIO *z, void *b, size_t n) {
   while (n) {
     size_t m;
@@ -65,4 +68,3 @@ size_t luaZ_read (ZIO *z, void *b, size_t n) {
   }
   return 0;
 }
-

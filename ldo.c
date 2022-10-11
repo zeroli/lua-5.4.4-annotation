@@ -134,13 +134,14 @@ l_noret luaD_throw (lua_State *L, int errcode) {
   }
 }
 
-
+// 所谓的保护性的执行，就是catch异常
 int luaD_rawrunprotected (lua_State *L, Pfunc f, void *ud) {
   l_uint32 oldnCcalls = L->nCcalls;
   struct lua_longjmp lj;
   lj.status = LUA_OK;
   lj.previous = L->errorJmp;  /* chain new error handler */
   L->errorJmp = &lj;
+  // 利用C语言的setjmp实现try/catch exception
   LUAI_TRY(L, &lj,
     (*f)(L, ud);
   );
@@ -957,16 +958,16 @@ static void checkmode (lua_State *L, const char *mode, const char *x) {
   }
 }
 
-
+// parser函数入口， ******
 static void f_parser (lua_State *L, void *ud) {
   LClosure *cl;
   struct SParser *p = cast(struct SParser *, ud);
   int c = zgetc(p->z);  /* read first character */
-  if (c == LUA_SIGNATURE[0]) {
+  if (c == LUA_SIGNATURE[0]) {  // 编译后的二进制字节码
     checkmode(L, p->mode, "binary");
     cl = luaU_undump(L, p->z, p->name);
   }
-  else {
+  else {  // 文本模式的lua脚本
     checkmode(L, p->mode, "text");
     cl = luaY_parser(L, p->z, &p->buff, &p->dyd, p->name, c);
   }
@@ -977,7 +978,7 @@ static void f_parser (lua_State *L, void *ud) {
 
 int luaD_protectedparser (lua_State *L, ZIO *z, const char *name,
                                         const char *mode) {
-  struct SParser p;
+  struct SParser p;  // ****
   int status;
   incnny(L);  /* cannot yield during parsing */
   p.z = z; p.name = name; p.mode = mode;
@@ -985,6 +986,7 @@ int luaD_protectedparser (lua_State *L, ZIO *z, const char *name,
   p.dyd.gt.arr = NULL; p.dyd.gt.size = 0;
   p.dyd.label.arr = NULL; p.dyd.label.size = 0;
   luaZ_initbuffer(L, &p.buff);
+  // TODO: 一个疑问，就是为啥要这样保护性的调用呢？
   status = luaD_pcall(L, f_parser, &p, savestack(L, L->top), L->errfunc);
   luaZ_freebuffer(L, &p.buff);
   luaM_freearray(L, p.dyd.actvar.arr, p.dyd.actvar.size);
@@ -993,5 +995,3 @@ int luaD_protectedparser (lua_State *L, ZIO *z, const char *name,
   decnny(L);
   return status;
 }
-
-

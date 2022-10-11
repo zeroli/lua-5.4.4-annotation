@@ -22,8 +22,8 @@ typedef struct Zio ZIO;
 
 typedef struct Mbuffer {
   char *buffer;
-  size_t n;
-  size_t buffsize;
+  size_t n;  // 当前buffer的数据长度，字节
+  size_t buffsize;  // buffer整个大小，字节
 } Mbuffer;
 
 #define luaZ_initbuffer(L, buff) ((buff)->buffer = NULL, (buff)->buffsize = 0)
