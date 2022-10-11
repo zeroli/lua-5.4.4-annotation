@@ -967,16 +967,24 @@ LUALIB_API int luaL_getsubtable (lua_State *L, int idx, const char *fname) {
 */
 LUALIB_API void luaL_requiref (lua_State *L, const char *modname,
                                lua_CFunction openf, int glb) {
+  // 把register index所在的table中的以"LOADED"为key的table
+  // 放入到top of stack
   luaL_getsubtable(L, LUA_REGISTRYINDEX, LUA_LOADED_TABLE);
+  // 把module放入到top of stack，LOADED表仍然在栈中
   lua_getfield(L, -1, modname);  /* LOADED[modname] */
   if (!lua_toboolean(L, -1)) {  /* package not already loaded? */
     lua_pop(L, 1);  /* remove field */
     lua_pushcfunction(L, openf);
     lua_pushstring(L, modname);  /* argument to open function */
     lua_call(L, 1, 1);  /* call 'openf' to open module */
+    // -1: module，module留在了top of stack
     lua_pushvalue(L, -1);  /* make copy of module (call result) */
+    // -1: copy of module, -2: module, -3: LOADED表
+    // setfield会将copy of module从栈中弹出来
+    // -1: module, -2: LOADED表
     lua_setfield(L, -3, modname);  /* LOADED[modname] = module */
   }
+  // -1: module, -2: LOADED表
   lua_remove(L, -2);  /* remove LOADED table */
   if (glb) {
     lua_pushvalue(L, -1);  /* copy of module */
@@ -1103,4 +1111,3 @@ LUALIB_API void luaL_checkversion_ (lua_State *L, lua_Number ver, size_t sz) {
     luaL_error(L, "version mismatch: app. needs %f, Lua core provides %f",
                   (LUAI_UACNUMBER)ver, (LUAI_UACNUMBER)v);
 }
-

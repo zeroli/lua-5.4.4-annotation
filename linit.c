@@ -39,8 +39,9 @@
 ** these libs are loaded by lua.c and are readily available to any Lua
 ** program
 */
+// 所有内嵌支持的LUA库，C函数模块注册
 static const luaL_Reg loadedlibs[] = {
-  {LUA_GNAME, luaopen_base},
+  {LUA_GNAME, luaopen_base},  // base库全部导入到全局环境中_G
   {LUA_LOADLIBNAME, luaopen_package},
   {LUA_COLIBNAME, luaopen_coroutine},
   {LUA_TABLIBNAME, luaopen_table},
@@ -59,7 +60,6 @@ LUALIB_API void luaL_openlibs (lua_State *L) {
   /* "require" functions from 'loadedlibs' and set results to global table */
   for (lib = loadedlibs; lib->func; lib++) {
     luaL_requiref(L, lib->name, lib->func, 1);
-    lua_pop(L, 1);  /* remove lib */
+    lua_pop(L, 1);  /* remove lib */  // 注册的模块留在了top of stack
   }
 }
-

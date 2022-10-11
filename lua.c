@@ -154,10 +154,12 @@ static int docall (lua_State *L, int narg, int nres) {
   int status;
   int base = lua_gettop(L) - narg;  /* function index */
   lua_pushcfunction(L, msghandler);  /* push message handler */
+  // insert将top of stack插入到base前面，之后top变成了base
   lua_insert(L, base);  /* put it under function and args */
   globalL = L;  /* to be available to 'laction' */
   setsignal(SIGINT, laction);  /* set C-signal handler */
-  status = lua_pcall(L, narg, nres, base);
+  // pcall可以根据narg从top推断出它要执行的function
+  status = lua_pcall(L, narg, nres, base);  // base就是msghandler, error function
   setsignal(SIGINT, SIG_DFL); /* reset C-signal handler */
   lua_remove(L, base);  /* remove message handler from the stack */
   return status;
@@ -233,12 +235,14 @@ static int dolibrary (lua_State *L, char *globname) {
 */
 static int pushargs (lua_State *L) {
   int i, n;
+  // getglobal会将arg表放到top of stack
   if (lua_getglobal(L, "arg") != LUA_TTABLE)
     luaL_error(L, "'arg' is not a table");
   n = (int)luaL_len(L, -1);
   luaL_checkstack(L, n + 3, "too many arguments to script");
   for (i = 1; i <= n; i++)
     lua_rawgeti(L, -i, i);
+  // 去除arg表
   lua_remove(L, -i);  /* remove table from the stack */
   return n;
 }
@@ -621,6 +625,7 @@ static int pmain (lua_State *L) {
     lua_pushboolean(L, 1);  /* signal for libraries to ignore env. vars. */
     lua_setfield(L, LUA_REGISTRYINDEX, "LUA_NOENV");
   }
+  // 注册所有标准库c函数到LUA执行环境
   luaL_openlibs(L);  /* open standard libraries */
   createargtable(L, argv, argc, script);  /* create table 'arg' */
   lua_gc(L, LUA_GCGEN, 0, 0);  /* GC in generational mode */
@@ -654,13 +659,16 @@ int main (int argc, char **argv) {
     l_message(argv[0], "cannot create state: not enough memory");
     return EXIT_FAILURE;
   }
+  // LUA和C之间的通信渠道：stack， 从1开始，top
+  //   | argv   |  <--- top (1)
+  //   | argc   |  (2)
+  //   | pmain |  (3)
   lua_pushcfunction(L, &pmain);  /* to call 'pmain' in protected mode */
   lua_pushinteger(L, argc);  /* 1st argument */
   lua_pushlightuserdata(L, argv); /* 2nd argument */
-  status = lua_pcall(L, 2, 1, 0);  /* do the call */
-  result = lua_toboolean(L, -1);  /* get result */
+  status = lua_pcall(L, 2, 1, 0);  /* do the call */  // 2个参数，1个返回结果
+  result = lua_toboolean(L, -1);  /* get result */  // 也可以通过-1拿到stack top的值
   report(L, status);
   lua_close(L);
   return (result && status == LUA_OK) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
-
