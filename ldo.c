@@ -137,7 +137,7 @@ l_noret luaD_throw (lua_State *L, int errcode) {
 // 所谓的保护性的执行，就是catch异常
 int luaD_rawrunprotected (lua_State *L, Pfunc f, void *ud) {
   l_uint32 oldnCcalls = L->nCcalls;
-  struct lua_longjmp lj;
+  struct lua_longjmp lj;  // TODO：
   lj.status = LUA_OK;
   lj.previous = L->errorJmp;  /* chain new error handler */
   L->errorJmp = &lj;
@@ -414,14 +414,15 @@ l_sinline void moveresults (lua_State *L, StkId res, int nres, int wanted) {
   int i;
   switch (wanted) {  /* handle typical cases separately */
     case 0:  /* no values needed */
-      L->top = res;
+      L->top = res;  // 没有返回值，之前函数位置就是top位置，函数间接的去除
       return;
     case 1:  /* one value needed */
       if (nres == 0)   /* no results? */
         setnilvalue(s2v(res));  /* adjust with nil */
       else  /* at least one result */
+        // ok，我只需要一个结果，-1位置，copy到res位置，以前函数所在的位置
         setobjs2s(L, res, L->top - nres);  /* move it to proper place */
-      L->top = res + 1;
+      L->top = res + 1;  // 丢弃所有其它的results
       return;
     case LUA_MULTRET:
       wanted = nres;  /* we want all results */
@@ -443,6 +444,8 @@ l_sinline void moveresults (lua_State *L, StkId res, int nres, int wanted) {
       break;
   }
   /* generic case */
+  // 通常，如果函数返回的个数小于想要的，没提供的需要填充nil
+  // 否则，就丢弃那些多余的结果，只留下从1开始的结果
   firstresult = L->top - nres;  /* index of first result */
   if (nres > wanted)  /* extra results? */
     nres = wanted;  /* don't need them */
@@ -469,6 +472,7 @@ void luaD_poscall (lua_State *L, CallInfo *ci, int nres) {
   /* function cannot be in any of these cases when returning */
   lua_assert(!(ci->callstatus &
         (CIST_HOOKED | CIST_YPCALL | CIST_FIN | CIST_TRAN | CIST_CLSRET)));
+  // 回到上一级调用者
   L->ci = ci->previous;  /* back to caller (after closing variables) */
 }
 
@@ -495,7 +499,9 @@ l_sinline int precallC (lua_State *L, StkId func, int nresults,
                                             lua_CFunction f) {
   int n;  /* number of returns */
   CallInfo *ci;
+  // 每次调用light c函数，都至少有20个栈空闲空间
   checkstackGCp(L, LUA_MINSTACK, func);  /* ensure minimum stack size */
+  // 这次函数调用需要新的callinfo调用frame，作为当前call info
   L->ci = ci = prepCallInfo(L, func, nresults, CIST_C,
                                L->top + LUA_MINSTACK);
   lua_assert(ci->top <= L->stack_last);
@@ -504,6 +510,7 @@ l_sinline int precallC (lua_State *L, StkId func, int nresults,
     luaD_hook(L, LUA_HOOKCALL, -1, 1, narg);
   }
   lua_unlock(L);
+  // ****， 直接调用C函数
   n = (*f)(L);  /* do the actual call */
   lua_lock(L);
   api_checknelems(L, n);
@@ -569,20 +576,27 @@ CallInfo *luaD_precall (lua_State *L, StkId func, int nresults) {
     case LUA_VCCL:  /* C closure */
       precallC(L, func, nresults, clCvalue(s2v(func))->f);
       return NULL;
-    case LUA_VLCF:  /* light C function */
+    case LUA_VLCF:  /* light C function */ // 函数签名: int (*)(lua_State*)
       precallC(L, func, nresults, fvalue(s2v(func)));
       return NULL;
     case LUA_VLCL: {  /* Lua function */
+    // TODO： 什么时候调用LUA function呢？需要研究下它的被调用路径
       CallInfo *ci;
       Proto *p = clLvalue(s2v(func))->p;
       int narg = cast_int(L->top - func) - 1;  /* number of real arguments */
       int nfixparams = p->numparams;
+      // TODO：maxstacksize咋确定的呢？
       int fsize = p->maxstacksize;  /* frame size */
       checkstackGCp(L, fsize, func);
+      // LUA函数调用，也需要call info
       L->ci = ci = prepCallInfo(L, func, nresults, 0, func + 1 + fsize);
+      // lua函数的字节码开始点
       ci->u.l.savedpc = p->code;  /* starting point */
+      // 参数不够的，用nil填充
       for (; narg < nfixparams; narg++)
         setnilvalue(s2v(L->top++));  /* complete missing arguments */
+      // ci->top在`prepCallInfo`里面已经增长了fsizearg
+      // TODO：func + 1 + fsize，说明在LUA函数中，stack会使用args的槽？？
       lua_assert(ci->top <= L->stack_last);
       return ci;
     }
@@ -605,6 +619,7 @@ l_sinline void ccall (lua_State *L, StkId func, int nResults, int inc) {
   L->nCcalls += inc;
   if (l_unlikely(getCcalls(L) >= LUAI_MAXCCALLS))
     luaE_checkcstack(L);
+  // 先尝试以C函数来调用，否则prepare LUA函数调用，会进入到VM执行
   if ((ci = luaD_precall(L, func, nResults)) != NULL) {  /* Lua function? */
     ci->callstatus = CIST_FRESH;  /* mark that it is a "fresh" execute */
     luaV_execute(L, ci);  /* call it */
@@ -920,7 +935,7 @@ int luaD_closeprotected (lua_State *L, ptrdiff_t level, int status) {
 int luaD_pcall (lua_State *L, Pfunc func, void *u,
                 ptrdiff_t old_top, ptrdiff_t ef) {
   int status;
-  CallInfo *old_ci = L->ci;
+  CallInfo *old_ci = L->ci;  // 当前callinfo
   lu_byte old_allowhooks = L->allowhook;
   ptrdiff_t old_errfunc = L->errfunc;
   L->errfunc = ef;

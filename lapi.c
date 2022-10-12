@@ -1036,7 +1036,7 @@ struct CallS {  /* data to 'f_call' */
   int nresults;
 };
 
-
+// lua_pcallk最终调用这个函数
 static void f_call (lua_State *L, void *ud) {
   struct CallS *c = cast(struct CallS *, ud);
   luaD_callnoyield(L, c->func, c->nresults);
@@ -1044,9 +1044,10 @@ static void f_call (lua_State *L, void *ud) {
 
 
 
+// protected call函数实现
 LUA_API int lua_pcallk (lua_State *L, int nargs, int nresults, int errfunc,
                         lua_KContext ctx, lua_KFunction k) {
-  struct CallS c;
+  struct CallS c;  // 简单包装结构，执行函数及其结果个数
   int status;
   ptrdiff_t func;
   lua_lock(L);
@@ -1060,8 +1061,9 @@ LUA_API int lua_pcallk (lua_State *L, int nargs, int nresults, int errfunc,
   else {
     StkId o = index2stack(L, errfunc);
     api_check(L, ttisfunction(s2v(o)), "error handler must be a function");
-    func = savestack(L, o);
+    func = savestack(L, o); // error 函数在栈上位置，字节偏移
   }
+  // 调用函数所在栈上位置，如果没有参数，它就是-1栈顶
   c.func = L->top - (nargs+1);  /* function to be called */
   if (k == NULL || !yieldable(L)) {  /* no continuation or no yieldable? */
     c.nresults = nresults;  /* do a 'conventional' protected call */

@@ -655,6 +655,7 @@ typedef struct CClosure {
 } CClosure;
 
 
+// LUA closure结构
 typedef struct LClosure {
   ClosureHeader;
   struct Proto *p;

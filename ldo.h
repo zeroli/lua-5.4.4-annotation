@@ -37,6 +37,10 @@
 
 
 /* macro to check stack size, preserving 'p' */
+// 这个宏的作用是确保top of stack上面还有n个空闲
+// 以确保栈上空间足够，函数调用期间不会overflow
+// 如果不能满足，需要grow stack，p指针需要update
+// 保存p在栈上所在位置，然后grow stack，最后根据保存的位置恢复指针
 #define checkstackGCp(L,n,p)  \
   luaD_checkstackaux(L, n, \
     ptrdiff_t t__ = savestack(L, p);  /* save 'p' */ \
@@ -76,4 +80,3 @@ LUAI_FUNC l_noret luaD_throw (lua_State *L, int errcode);
 LUAI_FUNC int luaD_rawrunprotected (lua_State *L, Pfunc f, void *ud);
 
 #endif
-

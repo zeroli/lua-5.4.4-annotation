@@ -314,13 +314,13 @@ struct lua_State {
   lu_byte status;
   lu_byte allowhook;
   unsigned short nci;  /* number of items in 'ci' list */
-  StkId top;  /* first free slot in the stack */  // stack上第一个空闲的slot
+  StkId top;  /* first free slot in the stack */  // stack中第一个空闲的slot
   global_State *l_G;
   CallInfo *ci;  /* call info for current function */
   StkId stack_last;  /* end of stack (last element + 1) */
   StkId stack;  /* stack base */
   UpVal *openupval;  /* list of open upvalues in this stack */
-  StkId tbclist;  /* list of to-be-closed variables */
+  StkId tbclist;  /* list of to-be-closed variables */  // TODO：
   GCObject *gclist;
   struct lua_State *twups;  /* list of threads with open upvalues */
   struct lua_longjmp *errorJmp;  /* current error recover point */
