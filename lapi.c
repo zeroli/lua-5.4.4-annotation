@@ -271,6 +271,7 @@ LUA_API void lua_copy (lua_State *L, int fromidx, int toidx) {
 }
 
 
+// copy一份idx元素到top中，叫push
 LUA_API void lua_pushvalue (lua_State *L, int idx) {
   lua_lock(L);
   setobj2s(L, L->top, index2value(L, idx));

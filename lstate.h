@@ -137,6 +137,7 @@ struct lua_longjmp;  /* defined in ldo.c */
 #define EXTRA_STACK   5
 
 
+// LUA_MINSTACK = 20，所以有40个栈元素
 #define BASIC_STACK_SIZE        (2*LUA_MINSTACK)
 
 #define stacksize(th)	cast_int((th)->stack_last - (th)->stack)
@@ -246,6 +247,7 @@ typedef struct CallInfo {
 /*
 ** 'global state', shared by all threads of this state
 */
+// 全局state，进程拥有
 typedef struct global_State {
   lua_Alloc frealloc;  /* function to reallocate memory */
   void *ud;         /* auxiliary data to 'frealloc' */

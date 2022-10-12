@@ -30,3 +30,16 @@ C-API，它是如何与用户C语言程序进行交互的
 对于LUA，我们需要重点研究学习它的虚拟机VM的实现以及垃圾回收的实现
 * 虚拟机VM的实现，涉及到LUA脚本解析，中间字节代码(opcode)的生成以及执行
 * 垃圾回收的实现，涉及到如何管理不同类型的对象，如何标记可收回垃圾对象等
+
+
+| file name | comment |
+| --- | --- |
+| lvm.{h/c} | LUA虚拟机的实现 |
+| lobject.{h/c} | LUA数据类型的定义 |
+| ltm.{h/c} | LUA tagmethod的定义 |
+| lopcodes.{h/c} | LUA虚拟机字节码的定义 |
+| lcode.{h/c} | LUA opcode的生成 |
+| lgc.{h/c} | LUA的垃圾回收的实现 |
+| lparser.{h/c} | parser相关的代码 |
+| llex.{h/c} | lexer相关的代码 |
+| lstate.{h/c} | lua_State的定义 |

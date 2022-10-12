@@ -1938,6 +1938,7 @@ static void mainfunc (LexState *ls, FuncState *fs) {
 }
 
 
+// ok，这个就是parser的入口了
 LClosure *luaY_parser (lua_State *L, ZIO *z, Mbuffer *buff,
                        Dyndata *dyd, const char *name, int firstchar) {
   LexState lexstate;

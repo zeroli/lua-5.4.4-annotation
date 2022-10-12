@@ -929,6 +929,8 @@ LUALIB_API const char *luaL_tolstring (lua_State *L, int idx, size_t *len) {
 ** function gets the 'nup' elements at the top as upvalues.
 ** Returns with only the table at the stack.
 */
+// 调用函数前，栈顶(-1)放着一个表
+// 把列表中所有项(key => value)注册到栈顶表中
 LUALIB_API void luaL_setfuncs (lua_State *L, const luaL_Reg *l, int nup) {
   luaL_checkstack(L, nup, "too many upvalues");
   for (; l->name != NULL; l++) {  /* fill the table with given functions */
@@ -1020,7 +1022,7 @@ LUALIB_API const char *luaL_gsub (lua_State *L, const char *s,
   return lua_tostring(L, -1);
 }
 
-
+// 调用常规的分配内存和释放内存函数
 static void *l_alloc (void *ud, void *ptr, size_t osize, size_t nsize) {
   (void)ud; (void)osize;  /* not used */
   if (nsize == 0) {
@@ -1098,10 +1100,15 @@ static void warnfon (void *ud, const char *message, int tocont) {
 }
 
 
+// 用户通常调用这个包装函数new state
 LUALIB_API lua_State *luaL_newstate (void) {
+  // 调用偏底层的lua_newstage，传递l_alloc函数来分配内存
   lua_State *L = lua_newstate(l_alloc, NULL);
   if (l_likely(L)) {
+    // 通常L分配成功，设置panic函数
+    // panic函数就是写error message到控制台，然后就返回lua环境
     lua_atpanic(L, &panic);
+    // 设置warn函数
     lua_setwarnf(L, warnfoff, L);  /* default is warnings off */
   }
   return L;

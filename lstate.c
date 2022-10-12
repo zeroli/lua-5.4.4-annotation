@@ -177,16 +177,23 @@ LUAI_FUNC void luaE_incCstack (lua_State *L) {
 }
 
 
+// 对虚拟栈进行初始化，这个函数比较重要，对理解虚拟栈的布局比较关键
 static void stack_init (lua_State *L1, lua_State *L) {
   int i; CallInfo *ci;
   /* initialize stack array */
+  // 总共有45个栈元素，栈元素类型为`StackValue`
+  // `StkId`是`StackValue`类型指针
   L1->stack = luaM_newvector(L, BASIC_STACK_SIZE + EXTRA_STACK, StackValue);
   L1->tbclist = L1->stack;
+  // 初始化stack元素的值为NIL
   for (i = 0; i < BASIC_STACK_SIZE + EXTRA_STACK; i++)
     setnilvalue(s2v(L1->stack + i));  /* erase new stack */
+  // top为下一个位置，当前指向栈底，代表没有元素
   L1->top = L1->stack;
+  // stack末尾，beyond the end
   L1->stack_last = L1->stack + BASIC_STACK_SIZE;
   /* initialize first ci */
+  // call info是一个双向链表
   ci = &L1->base_ci;
   ci->next = ci->previous = NULL;
   ci->callstatus = CIST_C;
@@ -194,8 +201,9 @@ static void stack_init (lua_State *L1, lua_State *L) {
   ci->u.c.k = NULL;
   ci->nresults = 0;
   setnilvalue(s2v(L1->top));  /* 'function' entry for this 'ci' */
-  L1->top++;
+  L1->top++;  // increase top了！！！
   ci->top = L1->top + LUA_MINSTACK;
+  // 当前state的ci指向第一个call info
   L1->ci = ci;
 }
 
@@ -215,12 +223,19 @@ static void freestack (lua_State *L) {
 */
 static void init_registry (lua_State *L, global_State *g) {
   /* create registry */
+  // registry其实一个hash table
   Table *registry = luaH_new(L);
+  // *** TODO：需要好好研究，当前可以理解为全局registry被设置为registry
+  // 注意：g->l_registry是TValue类型，通用类型，registry是具体的Table类型
   sethvalue(L, &g->l_registry, registry);
+  // 现在注册表里只有2项，一个是主线程state，一个是全局符号表
   luaH_resize(L, registry, LUA_RIDX_LAST, 0);
+  // 下面，table当前一个数组来用
   /* registry[LUA_RIDX_MAINTHREAD] = L */
+  // 主线程作为第1项放在注册表
   setthvalue(L, &registry->array[LUA_RIDX_MAINTHREAD - 1], L);
   /* registry[LUA_RIDX_GLOBALS] = new table (table of globals) */
+  // 这里，全局符号表创建，放在了registry表里面第2项
   sethvalue(L, &registry->array[LUA_RIDX_GLOBALS - 1], luaH_new(L));
 }
 
@@ -229,13 +244,19 @@ static void init_registry (lua_State *L, global_State *g) {
 ** open parts of the state that may cause memory-allocation errors.
 */
 static void f_luaopen (lua_State *L, void *ud) {
-  global_State *g = G(L);
+  global_State *g = G(L);  // 之前设置过L->G到全局的state
   UNUSED(ud);
+  // 初始化虚拟栈
   stack_init(L, L);  /* init stack */
+  // 初始化注册表
   init_registry(L, g);
+  // 初始化字符串表hashtable和字符串缓存
   luaS_init(L);
+  // tag method表初始化
   luaT_init(L);
+  // Lexer的keyword字符串初始化
   luaX_init(L);
+  // gc stop = 0
   g->gcstp = 0;  /* allow gc */
   setnilvalue(&g->nilvalue);  /* now state is complete */
   luai_userstateopen(L);
@@ -247,7 +268,7 @@ static void f_luaopen (lua_State *L, void *ud) {
 ** any memory (to avoid errors)
 */
 static void preinit_thread (lua_State *L, global_State *g) {
-  G(L) = g;
+  G(L) = g;  // OK，这行将每个L关联全局的state了
   L->stack = NULL;
   L->ci = NULL;
   L->nci = 0;
@@ -279,6 +300,8 @@ static void close_state (lua_State *L) {
   luaM_freearray(L, G(L)->strt.hash, G(L)->strt.size);
   freestack(L);
   lua_assert(gettotalbytes(g) == sizeof(LG));
+  // 释放最后的LG对象，包括当前L和全局state
+  // 从L指针可以根据它在LG中的offset，求得LG指针
   (*g->frealloc)(g->ud, fromstate(L), sizeof(LG), 0);  /* free main block */
 }
 
@@ -352,30 +375,45 @@ LUA_API int lua_resetthread (lua_State *L) {
 }
 
 
+// OK，我们来看下，new一个lua_State会发生什么？
 LUA_API lua_State *lua_newstate (lua_Alloc f, void *ud) {
   int i;
   lua_State *L;
-  global_State *g;
+  global_State *g;  // OK，这就是全局的state！！！
+  // 就是分配一个LG对象，LG对象简单包装全局state
+  /*
+    typedef struct LG {
+    LX l;
+    global_State g;
+  } LG;
+  */
   LG *l = cast(LG *, (*f)(ud, NULL, LUA_TTHREAD, sizeof(LG)));
   if (l == NULL) return NULL;
-  L = &l->l.l;
-  g = &l->g;
+  L = &l->l.l;  // 系统第一个线程lua_State
+  g = &l->g;  // OK, 这里有了全局state对象指针了
   L->tt = LUA_VTHREAD;
+  // **** TODO： 这是在干什么，GC相关么？
   g->currentwhite = bitmask(WHITE0BIT);
   L->marked = luaC_white(g);
+
   preinit_thread(L, g);
   g->allgc = obj2gco(L);  /* by now, only object is the main thread */
   L->next = NULL;
+
   incnny(L);  /* main thread is always non yieldable */
-  g->frealloc = f;
-  g->ud = ud;
+  g->frealloc = f;  // 用户提供的alloc分配函数作为全局性的
+  g->ud = ud;  // 用户数据，当前为null
   g->warnf = NULL;
   g->ud_warn = NULL;
+  // 全局state有一个主线程lua_State
   g->mainthread = L;
   g->seed = luai_makeseed(L);
   g->gcstp = GCSTPGC;  /* no GC while building state */
+  // 这是在创建全局inplace string表，就是一个hash表
   g->strt.size = g->strt.nuse = 0;
   g->strt.hash = NULL;
+
+  // 全局注册表？？
   setnilvalue(&g->l_registry);
   g->panic = NULL;
   g->gcstate = GCSpause;
@@ -389,7 +427,7 @@ LUA_API lua_State *lua_newstate (lua_Alloc f, void *ud) {
   g->gray = g->grayagain = NULL;
   g->weak = g->ephemeron = g->allweak = NULL;
   g->twups = NULL;
-  g->totalbytes = sizeof(LG);
+  g->totalbytes = sizeof(LG); // 统计内存字节数
   g->GCdebt = 0;
   g->lastatomic = 0;
   setivalue(&g->nilvalue, 0);  /* to signal that state is not yet built */
@@ -399,6 +437,7 @@ LUA_API lua_State *lua_newstate (lua_Alloc f, void *ud) {
   setgcparam(g->genmajormul, LUAI_GENMAJORMUL);
   g->genminormul = LUAI_GENMINORMUL;
   for (i=0; i < LUA_NUMTAGS; i++) g->mt[i] = NULL;
+  // 调用`f_luaopen`？？
   if (luaD_rawrunprotected(L, f_luaopen, NULL) != LUA_OK) {
     /* memory allocation error: free partial state */
     close_state(L);
@@ -437,4 +476,3 @@ void luaE_warnerror (lua_State *L, const char *where) {
   luaE_warning(L, msg, 1);
   luaE_warning(L, ")", 0);
 }
-

@@ -123,13 +123,18 @@ void luaS_clearcache (global_State *g) {
 void luaS_init (lua_State *L) {
   global_State *g = G(L);
   int i, j;
+  // 全局state中的字符串表
   stringtable *tb = &G(L)->strt;
+  // 分配128项，hash表槽的初始个数，每项是TString*类型
   tb->hash = luaM_newvector(L, MINSTRTABSIZE, TString*);
+  // 初始化每一个槽NULL
   tablerehash(tb->hash, 0, MINSTRTABSIZE);  /* clear array */
-  tb->size = MINSTRTABSIZE;
+  tb->size = MINSTRTABSIZE; // 大小为128
   /* pre-create memory-error message */
   g->memerrmsg = luaS_newliteral(L, MEMERRMSG);
+  // fix这个gc对象，永远不会被垃圾回收
   luaC_fix(L, obj2gco(g->memerrmsg));  /* it should never be collected */
+  // 二维数组，字符串cache？？53 x 2
   for (i = 0; i < STRCACHE_N; i++)  /* fill cache with valid strings */
     for (j = 0; j < STRCACHE_M; j++)
       g->strcache[i][j] = g->memerrmsg;
@@ -270,4 +275,3 @@ Udata *luaS_newudata (lua_State *L, size_t s, int nuvalue) {
     setnilvalue(&u->uv[i].uv);
   return u;
 }
-

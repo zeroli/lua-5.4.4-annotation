@@ -20,7 +20,7 @@
 #include "lauxlib.h"
 #include "lualib.h"
 
-
+// print调用完之后，栈上所有元素全部pop出去了
 static int luaB_print (lua_State *L) {
   int n = lua_gettop(L);  /* number of arguments */
   int i;
@@ -536,14 +536,18 @@ static const luaL_Reg base_funcs[] = {
 
 LUAMOD_API int luaopen_base (lua_State *L) {
   /* open lib into global table */
+  // 把全局表push到栈顶(-1)
   lua_pushglobaltable(L);
+  // 全局表在栈顶，设置一些常用的基本函数
   luaL_setfuncs(L, base_funcs, 0);
   /* set global _G */
+  // push上面全局表(-1)的拷贝到栈顶，-1/-2对应的栈元素相同
   lua_pushvalue(L, -1);
+  // GLOBAL["_G"] = GLOBAL
   lua_setfield(L, -2, LUA_GNAME);
   /* set global _VERSION */
+  // GLOBAL["_VERSION"] = LUA_VERSION
   lua_pushliteral(L, LUA_VERSION);
   lua_setfield(L, -2, "_VERSION");
   return 1;
 }
-
