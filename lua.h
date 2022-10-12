@@ -387,10 +387,18 @@ LUA_API void (lua_closeslot) (lua_State *L, int idx);
 #define lua_tostring(L,i)	lua_tolstring(L, (i), NULL)
 
 
+// insert：移动top元素到idx前面
+// 用rotate来实现，从idx开始向右rotate一个元素，这样top元素就插入到idx位置
+// x y z (idx) x1 y1 z1 (top) => x y z (top) (idx) x1 y1 z1
 #define lua_insert(L,idx)	lua_rotate(L, (idx), 1)
 
+// 跟insert类似，采用rotate来实现，向左移动一位
+// x y z (idx) x1 y1 z1 => x y z x1 y1 z1 (idx)
+// 然后再pop一个元素(idx)
 #define lua_remove(L,idx)	(lua_rotate(L, (idx), -1), lua_pop(L, 1))
 
+// 用top元素替换(idx)元素
+// 先将top (-1)元素拷贝到(idx)处，然后pop top元素
 #define lua_replace(L,idx)	(lua_copy(L, -1, (idx)), lua_pop(L, 1))
 
 /* }============================================================== */

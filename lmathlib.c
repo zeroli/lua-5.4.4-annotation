@@ -26,9 +26,13 @@
 #define PI	(l_mathop(3.141592653589793238462643383279502884))
 
 
+// `luaL_checknumber` => 并没有pop出对应的stack元素
+// check比to函数要多一个check，如果原来不是对应类型，转换会失败
 static int math_abs (lua_State *L) {
   if (lua_isinteger(L, 1)) {
     lua_Integer n = lua_tointeger(L, 1);
+    // 如果n是最小的负数，那么下面的求绝对值后，仍然为负数，
+    // 因为最小的负数并没有对应的正数
     if (n < 0) n = (lua_Integer)(0u - (lua_Unsigned)n);
     lua_pushinteger(L, n);
   }
@@ -749,9 +753,12 @@ static const luaL_Reg mathlib[] = {
 ** Open math library
 */
 LUAMOD_API int luaopen_math (lua_State *L) {
+  // 在创建mathlib时，对于一些常量，没有对应的C函数，
+  // 上面就简单设置为NULL，placeholder，之后再去设置对应的field
   luaL_newlib(L, mathlib);
+  // 看，下面两句就是设置PI常量
   lua_pushnumber(L, PI);
-  lua_setfield(L, -2, "pi");
+  lua_setfield(L, -2, "pi");  // math表留在了-2位置
   lua_pushnumber(L, (lua_Number)HUGE_VAL);
   lua_setfield(L, -2, "huge");
   lua_pushinteger(L, LUA_MAXINTEGER);
@@ -761,4 +768,3 @@ LUAMOD_API int luaopen_math (lua_State *L) {
   setrandfunc(L);
   return 1;
 }
-
