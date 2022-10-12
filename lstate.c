@@ -33,7 +33,7 @@
 ** thread state + extra space
 */
 typedef struct LX {
-  lu_byte extra_[LUA_EXTRASPACE];
+  lu_byte extra_[LUA_EXTRASPACE];  // TODO：这个是干什么呢？align？？
   lua_State l;
 } LX;
 
@@ -47,7 +47,7 @@ typedef struct LG {
 } LG;
 
 
-
+// 已知一个L，便可以依据它在LX中的offset获取LX的指针
 #define fromstate(L)	(cast(LX *, cast(lu_byte *, (L)) - offsetof(LX, l)))
 
 
@@ -68,6 +68,10 @@ typedef struct LG {
   { size_t t = cast_sizet(e); \
     memcpy(b + p, &t, sizeof(t)); p += sizeof(t); }
 
+// 这种生成seed的方法，比较特别
+// local变量h仍然是依据当前时间点
+// 而且代码更改，L和全局函数地址也会变
+// 生成的hash作为种子也会变
 static unsigned int luai_makeseed (lua_State *L) {
   char buff[3 * sizeof(size_t)];
   unsigned int h = cast_uint(time(NULL));
@@ -86,6 +90,7 @@ static unsigned int luai_makeseed (lua_State *L) {
 ** set GCdebt to a new value keeping the value (totalbytes + GCdebt)
 ** invariant (and avoiding underflows in 'totalbytes')
 */
+// TODO: 这个函数要做什么？
 void luaE_setdebt (global_State *g, l_mem debt) {
   l_mem tb = gettotalbytes(g);
   lua_assert(tb > 0);
@@ -101,7 +106,7 @@ LUA_API int lua_setcstacklimit (lua_State *L, unsigned int limit) {
   return LUAI_MAXCCALLS;  /* warning?? */
 }
 
-
+// 创建一个新的CI，连接到当前CI的后面
 CallInfo *luaE_extendCI (lua_State *L) {
   CallInfo *ci;
   lua_assert(L->ci->next == NULL);
@@ -123,6 +128,7 @@ void luaE_freeCI (lua_State *L) {
   CallInfo *ci = L->ci;
   CallInfo *next = ci->next;
   ci->next = NULL;
+  // 销毁所有当前CI后面的CI结构
   while ((ci = next) != NULL) {
     next = ci->next;
     luaM_free(L, ci);
@@ -140,6 +146,7 @@ void luaE_shrinkCI (lua_State *L) {
   CallInfo *next;
   if (ci == NULL)
     return;  /* no extra elements */
+  // 从ci的下一个节点开始，每隔一个节点，就删除一个节点，达到只删除一半节点的目的
   while ((next = ci->next) != NULL) {  /* two extra elements? */
     CallInfo *next2 = next->next;  /* next's next */
     ci->next = next2;  /* remove next from the list */
@@ -163,6 +170,7 @@ void luaE_shrinkCI (lua_State *L) {
 ** handling to work).
 */
 void luaE_checkcstack (lua_State *L) {
+  // LUAI_MAXCCALLS = 200
   if (getCcalls(L) == LUAI_MAXCCALLS)
     luaG_runerror(L, "C stack overflow");
   else if (getCcalls(L) >= (LUAI_MAXCCALLS / 10 * 11))
@@ -202,7 +210,7 @@ static void stack_init (lua_State *L1, lua_State *L) {
   ci->nresults = 0;
   setnilvalue(s2v(L1->top));  /* 'function' entry for this 'ci' */
   L1->top++;  // increase top了！！！
-  ci->top = L1->top + LUA_MINSTACK;
+  ci->top = L1->top + LUA_MINSTACK;  // 第一个函数调用可以用20个stack元素
   // 当前state的ci指向第一个call info
   L1->ci = ci;
 }
@@ -306,28 +314,32 @@ static void close_state (lua_State *L) {
 }
 
 
+// 从一个线程创建另一个线程状态
 LUA_API lua_State *lua_newthread (lua_State *L) {
   global_State *g;
   lua_State *L1;
   lua_lock(L);
-  g = G(L);
+  g = G(L);  // 进程全局state
   luaC_checkGC(L);
   /* create new thread */
+  // 创建一个新线程状态，只创建LX，不需要进程状态
   L1 = &cast(LX *, luaM_newobject(L, LUA_TTHREAD, sizeof(LX)))->l;
   L1->marked = luaC_white(g);
-  L1->tt = LUA_VTHREAD;
+  L1->tt = LUA_VTHREAD;  // 线程对象
   /* link it on list 'allgc' */
-  L1->next = g->allgc;
+  L1->next = g->allgc;  // 链到所有gc对象链表头，单链表
   g->allgc = obj2gco(L1);
   /* anchor it on L stack */
   setthvalue2s(L, L->top, L1);
   api_incr_top(L);
+  // 预初始化这个新的线程对象
   preinit_thread(L1, g);
   L1->hookmask = L->hookmask;
   L1->basehookcount = L->basehookcount;
   L1->hook = L->hook;
   resethookcount(L1);
   /* initialize L1 extra space */
+  // TODO: 这个操作是在干嘛？？
   memcpy(lua_getextraspace(L1), lua_getextraspace(g->mainthread),
          LUA_EXTRASPACE);
   luai_userstatethread(L, L1);
@@ -360,7 +372,7 @@ int luaE_resetthread (lua_State *L, int status) {
     luaD_seterrorobj(L, status, L->stack + 1);
   else
     L->top = L->stack + 1;
-  ci->top = L->top + LUA_MINSTACK;
+  ci->top = L->top + LUA_MINSTACK; // 第一个函数调用可以用20个stack元素
   luaD_reallocstack(L, cast_int(ci->top - L->stack), 0);
   return status;
 }
@@ -391,12 +403,13 @@ LUA_API lua_State *lua_newstate (lua_Alloc f, void *ud) {
   if (l == NULL) return NULL;
   L = &l->l.l;  // 系统第一个线程lua_State
   g = &l->g;  // OK, 这里有了全局state对象指针了
-  L->tt = LUA_VTHREAD;
+  L->tt = LUA_VTHREAD;  // 设置为线程对象
   // **** TODO： 这是在干什么，GC相关么？
   g->currentwhite = bitmask(WHITE0BIT);
   L->marked = luaC_white(g);
 
   preinit_thread(L, g);
+  // 链接这个线程对象，可回收对象到gc链表头
   g->allgc = obj2gco(L);  /* by now, only object is the main thread */
   L->next = NULL;
 

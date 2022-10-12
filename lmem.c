@@ -132,7 +132,7 @@ l_noret luaM_toobig (lua_State *L) {
 void luaM_free_ (lua_State *L, void *block, size_t osize) {
   global_State *g = G(L);
   lua_assert((osize == 0) == (block == NULL));
-  (*g->frealloc)(g->ud, block, osize, 0);
+  (*g->frealloc)(g->ud, block, osize, 0);  // 其实就是调用free
   g->GCdebt -= osize;
 }
 

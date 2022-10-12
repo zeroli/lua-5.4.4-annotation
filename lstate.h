@@ -148,6 +148,7 @@ struct lua_longjmp;  /* defined in ldo.c */
 #define KGC_GEN		1	/* generational gc */
 
 
+// string table, hash table
 typedef struct stringtable {
   TString **hash;
   int nuse;  /* number of elements */
@@ -170,11 +171,16 @@ typedef struct stringtable {
 ** - field 'transferinfo' is used only during call/returnhooks,
 ** before the function starts or after it ends.
 */
+// 很重要的数据结构，代表call frame，每个call frame代表一个函数
+// previous/next形成双向链表
 typedef struct CallInfo {
+  // 当前执行的函数
   StkId func;  /* function index in the stack */
   StkId	top;  /* top for this function */
   struct CallInfo *previous, *next;  /* dynamic call link */
+  // 调用函数要么是C函数，要么是LUA函数
   union {
+    // 如果是LUA函数，表示字节码指令
     struct {  /* only for Lua functions */
       const Instruction *savedpc;
       volatile l_signalT trap;
@@ -247,7 +253,7 @@ typedef struct CallInfo {
 /*
 ** 'global state', shared by all threads of this state
 */
-// 全局state，进程拥有
+// 全局state，代表当前进程状态
 typedef struct global_State {
   lua_Alloc frealloc;  /* function to reallocate memory */
   void *ud;         /* auxiliary data to 'frealloc' */
@@ -304,7 +310,7 @@ typedef struct global_State {
 ** 'per thread' state
 */
 struct lua_State {
-  CommonHeader;
+  CommonHeader;  // state本质上代表一个线程对象，也是一个可以回收的对象
   lu_byte status;
   lu_byte allowhook;
   unsigned short nci;  /* number of items in 'ci' list */
@@ -329,6 +335,7 @@ struct lua_State {
 };
 
 
+// 使用这个宏，从当前线程LUA state拿到全局进程状态
 #define G(L)	(L->l_G)
 
 /*

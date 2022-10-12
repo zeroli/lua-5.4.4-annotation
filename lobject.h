@@ -46,6 +46,9 @@
 /*
 ** Union of all Lua values
 */
+// LUA采用union体来表示所有的lua值类型
+// 函数，数值或者轻量级用户数据都可以直接表示在Value
+// 另一种类型就是GC可回收类型，采用GCObject*表示
 typedef union Value {
   struct GCObject *gc;    /* collectable objects */
   void *p;         /* light userdata */
@@ -62,6 +65,7 @@ typedef union Value {
 
 #define TValuefields	Value value_; lu_byte tt_
 
+// 值和值类型，值类型用一个字节表示
 typedef struct TValue {
   TValuefields;
 } TValue;
@@ -72,6 +76,10 @@ typedef struct TValue {
 
 
 /* raw type tag of a TValue */
+// 获取值的原始类型，这个原始类型不再简单表示类型了，
+// 它还嵌入了tag信息，在5-6bit位
+// 0-3bit位可以表示最初的值类型，最多表示16种类型，
+// 现在lua中只有9种类型，4个bit位足够了
 #define rawtt(o)	((o)->tt_)
 
 /* tag with no variants (bits 0-3) */
@@ -272,6 +280,11 @@ typedef StackValue *StkId;
 ** Common Header for all collectable objects (in macro form, to be
 ** included in other objects)
 */
+// 可收集对象类型用单链表串起来了
+// 这里又有一个tt类型，要知道`TValue`已经有一个tt_代表类型了
+// TODO： 两者有什么区别呢？？
+// 有了一个GCObject*指针，根据它的类型，
+// 我们可以将这个指针强制转换为对应的GC类型
 #define CommonHeader	struct GCObject *next; lu_byte tt; lu_byte marked
 
 
@@ -284,6 +297,7 @@ typedef struct GCObject {
 /* Bit mark for collectable types */
 #define BIT_ISCOLLECTABLE	(1 << 6)
 
+// 0-3代表原来数据类型，4-5bit代表variant，第6bit代表可收集？？
 #define iscollectable(o)	(rawtt(o) & BIT_ISCOLLECTABLE)
 
 /* mark a tag as collectable */
@@ -370,16 +384,18 @@ typedef struct GCObject {
 /*
 ** Header for a string value.
 */
+// 字符串数据，也是一个GC可回收的类型
 typedef struct TString {
-  CommonHeader;
+  CommonHeader;  // 包含GC头
   lu_byte extra;  /* reserved words for short strings; "has hash" for longs */
   lu_byte shrlen;  /* length for short strings */
   unsigned int hash;
+  // 这里采用union将length和hash next包裹起来是啥
   union {
     size_t lnglen;  /* length for long strings */
     struct TString *hnext;  /* linked list for hash table */
   } u;
-  char contents[1];
+  char contents[1];  // 字符串数据直接从这里开始，紧贴存储在TString结构体后面
 } TString;
 
 
@@ -387,6 +403,7 @@ typedef struct TString {
 /*
 ** Get the actual string (array of bytes) from a 'TString'.
 */
+// 获取真正的字符串数据
 #define getstr(ts)  ((ts)->contents)
 
 
@@ -797,4 +814,3 @@ LUAI_FUNC void luaO_chunkid (char *out, const char *source, size_t srclen);
 
 
 #endif
-
